@@ -1,0 +1,31 @@
+{
+  "name": "tally",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@react-native-ml-kit/text-recognition": "^2.0.0",
+    "expo": "~57.0.4",
+    "expo-dev-client": "~57.0.6",
+    "expo-document-picker": "^57.0.0",
+    "expo-file-system": "^57.0.0",
+    "expo-image-picker": "~57.0.0",
+    "expo-sharing": "^57.0.3",
+    "expo-sqlite": "^57.0.0",
+    "expo-status-bar": "~57.0.0",
+    "react": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-purchases": "^10.4.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "test": "npx tsx test-models.ts && npx tsx test-receipt.ts && npx tsx test-db.ts"
+  },
+  "private": true
+}

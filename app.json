@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Tally",
+    "slug": "tally",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "tally",
+    "owner": "boyscout1970",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tallysplit.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.tallysplit.app",
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Tally uses the camera to scan restaurant receipts.",
+          "photosPermission": "Tally reads receipt photos you pick so it can add the line items."
+        }
+      ]
+    ]
+  }
+}
