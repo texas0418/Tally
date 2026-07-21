@@ -4,11 +4,13 @@
     "slug": "tally",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "scheme": "tally",
     "owner": "boyscout1970",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
+      "appleTeamId": "75ULC33H2C",
       "bundleIdentifier": "com.tallysplit.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -25,7 +27,9 @@
           "cameraPermission": "Tally uses the camera to scan restaurant receipts.",
           "photosPermission": "Tally reads receipt photos you pick so it can add the line items."
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font"
     ]
   }
 }

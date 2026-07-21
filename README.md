@@ -31,7 +31,9 @@ forever (fail-open house rule — placeholder keys ⇒ Pro unlocked).
 
 ## Pre-ship TODOs
 
-- [ ] App icon + splash (assets/ is empty; app.json has no icon refs yet)
+- [x] App icon ("color count" tally marks, assets/icon.png; regenerate via the
+      CoreGraphics script in the repo history if the design changes)
+- [ ] Splash screen
 - [ ] Create EAS project (`eas init`, owner boyscout1970) and paste projectId into app.json
 - [ ] Create RevenueCat project; paste real keys into src/revenuecat.ts and
       CONFIRM the entitlement id on the RC dashboard (`pro` vs `Pro` trap)
