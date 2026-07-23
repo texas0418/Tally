@@ -5,6 +5,19 @@ people (scan the receipt or type them in); tip and tax are allocated
 pro-rata by each person's subtotal — never a lazy even split. Local-first:
 every bill lives in SQLite on the phone, nothing leaves the device.
 
+## App Store listing
+
+The bare name "Tally" is taken (counter/tracker apps — Agile Tortoise's
+"Tally • Quick Counter" et al.); none are bill splitters, so the niche is ours.
+
+- **Home-screen name** (app.json `name`, under the icon): `Tally` — keep short.
+- **App Store name** (ASC, ≤30 chars): `Tally: Bill Splitter & Tip`
+- **Subtitle** (ASC, ≤30 chars): `Scan receipts, split by item` (adds the
+  scan/receipt/item keywords the name doesn't cover)
+- **Keywords** (ASC, ≤100 chars, no spaces after commas, don't repeat name/
+  subtitle words): `tip,itemized,group,dinner,restaurant,share expense,receipt scanner,IOU,check,fair`
+  (avoid competitor trademarks like Splitwise — against ASC rules)
+
 ## Stack
 
 House pattern (see DreamFeed): Expo SDK 57, TypeScript strict, no navigation
