@@ -5,6 +5,7 @@ import {
   buildShareText,
   computeBillTotals,
   formatCents,
+  parseQuantity,
 } from './src/models';
 
 let failures = 0;
@@ -102,6 +103,21 @@ eq('formatCents zero', formatCents(0), '$0.00');
 const share = buildShareText('Casa Oaxaca', people, tf);
 eq('share text has header total', share.includes(formatCents(tf.grandTotalCents)), true);
 eq('share text lists Simon', share.includes('Simon'), true);
+
+// ---- parseQuantity ----
+eq('qty: 2X prefix', parseQuantity('2X CAESAR SALAD'), { qty: 2, base: 'CAESAR SALAD' });
+eq('qty: lowercase x with spaces', parseQuantity('3 x Tacos'), { qty: 3, base: 'Tacos' });
+eq('qty: number then space', parseQuantity('2 Sparkling Water'), {
+  qty: 2,
+  base: 'Sparkling Water',
+});
+eq('qty: no quantity', parseQuantity('Grilled Salmon'), null);
+eq('qty: 1X is not a split', parseQuantity('1X Coffee'), null);
+eq('qty: number then price-like digits ignored', parseQuantity('2 50 Blend'), null);
+eq('qty: absurd count rejected', parseQuantity('99X Fries'), null);
+// The split itself is just an even allocation — parts sum to the line price.
+eq('qty split allocation is exact', allocateProRata(2400, [1, 1]), [1200, 1200]);
+eq('qty split of odd price', allocateProRata(2500, [1, 1, 1]), [834, 833, 833]);
 
 console.log(failures ? `\n${failures} FAILED` : '\nall model tests passed');
 process.exit(failures ? 1 : 0);

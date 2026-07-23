@@ -35,6 +35,21 @@ export type Assignments = Map<number, Set<number>>;
 export const formatCents = (cents: number): string =>
   `$${(cents / 100).toFixed(2)}`;
 
+/** Detect a leading quantity like "2X CAESAR SALAD", "2 x Tacos", or "3 TACOS".
+ *  Returns the quantity (2..20) and the base label with the count stripped, or
+ *  null when the label isn't a multi-unit line. Used to offer "split into N
+ *  separate items" so each unit can go to a different person. */
+export function parseQuantity(label: string): { qty: number; base: string } | null {
+  const m =
+    label.match(/^\s*(\d{1,2})\s*[xX]\s*(.+)$/) ?? // "2X NAME" / "2 x NAME"
+    label.match(/^\s*(\d{1,2})\s+(\D.+)$/); //        "2 NAME" (not "2 50")
+  if (!m) return null;
+  const qty = parseInt(m[1], 10);
+  const base = m[2].trim();
+  if (qty < 2 || qty > 20 || !base) return null;
+  return { qty, base };
+}
+
 /** Split totalCents across weights so the parts sum exactly to totalCents.
  *  Largest fractional remainder wins the leftover cents; ties go to the
  *  lower index so the result is deterministic. Zero/negative weight sum

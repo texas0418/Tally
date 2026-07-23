@@ -2,9 +2,11 @@
 // The whole app on one screen: name the bill, add people, add/scan items,
 // tap a person then tap items to assign, tweak tip, read live totals, share.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,7 +19,13 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import type { Assignments, Bill, Item, Person } from '../models';
-import { buildShareText, computeBillTotals, formatCents } from '../models';
+import {
+  allocateProRata,
+  buildShareText,
+  computeBillTotals,
+  formatCents,
+  parseQuantity,
+} from '../models';
 import {
   addItem,
   addPerson,
@@ -27,6 +35,7 @@ import {
   listAssignments,
   listItems,
   listPeople,
+  renamePerson,
   setAssigned,
   updateBill,
   updateItem,
@@ -35,7 +44,7 @@ import { scanReceipt } from '../scanReceipt';
 import { useSettings } from '../SettingsContext';
 import { useProAccess, purchasePro } from '../proAccess';
 import { FREE_SCANS } from '../revenuecat';
-import { colors, personColor } from '../theme';
+import { brandStripe, colors, personColor } from '../theme';
 
 const TIP_PRESETS = [0, 15, 18, 20, 25];
 
@@ -43,9 +52,10 @@ interface Props {
   billId: number;
   onHistory: () => void;
   onSettings: () => void;
+  onNewBill: () => void;
 }
 
-export default function BillScreen({ billId, onHistory, onSettings }: Props) {
+export default function BillScreen({ billId, onHistory, onSettings, onNewBill }: Props) {
   const { settings, update } = useSettings();
   const pro = useProAccess();
 
@@ -56,14 +66,29 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
   // Item-first assignment: tap an item to focus it, then tap people to toggle
   // who shared it. null = nothing focused.
   const [focusedItemId, setFocusedItemId] = useState<number | null>(null);
+  // Tapping a person chip opens an inline rename/remove editor. Seeded on open,
+  // never on reload, so persisting a rename doesn't fight what's being typed.
+  const [editingPersonId, setEditingPersonId] = useState<number | null>(null);
+  const [personNameText, setPersonNameText] = useState('');
   const [newPersonName, setNewPersonName] = useState('');
   const [addingPerson, setAddingPerson] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [scanning, setScanning] = useState(false);
+  // Tax field holds its own raw text so typing/deleting isn't fought by
+  // reformatting. Resynced from the stored cents only on (re)load, never
+  // mid-keystroke.
+  const [taxText, setTaxText] = useState('');
+  // Edit fields for the focused item. Seeded when an item is focused (never on
+  // reload), so persisting an edit doesn't fight what's being typed.
+  const [editLabel, setEditLabel] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const nameRef = useRef<TextInput>(null);
 
   const reload = useCallback(() => {
-    setBill(getBill(billId));
+    const b = getBill(billId);
+    setBill(b);
+    setTaxText(b && b.taxCents > 0 ? (b.taxCents / 100).toFixed(2) : '');
     const ppl = listPeople(billId);
     setPeople(ppl);
     const its = listItems(billId);
@@ -103,14 +128,47 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
     const id = addItem(billId, label, cents);
     setNewLabel('');
     setNewPrice('');
+    Keyboard.dismiss(); // decimal-pad has no return key; close it on Add
     reload();
-    setFocusedItemId(id); // open the new item so you can assign it right away
+    openItem(id, label, cents); // open the new item so you can assign it right away
   };
 
-  /** Tapping an item focuses it (reveals the people toggles); tapping the
-   *  already-focused item collapses it. */
+  /** Focus an item and seed the edit fields from its current values. */
+  const openItem = (id: number, label: string, cents: number) => {
+    setFocusedItemId(id);
+    setEditLabel(label);
+    setEditPrice((cents / 100).toFixed(2));
+  };
+
+  /** Tapping an item focuses it (reveals edit fields + people toggles);
+   *  tapping the already-focused item collapses it. */
   const focusItem = (item: Item) => {
-    setFocusedItemId((cur) => (cur === item.id ? null : item.id!));
+    if (focusedItemId === item.id) {
+      setFocusedItemId(null);
+    } else {
+      openItem(item.id!, item.label, item.priceCents);
+    }
+  };
+
+  /** Persist an edit to the focused item's name/price. Keeps the last valid
+   *  value when a field is momentarily empty/invalid mid-typing. */
+  const commitItemEdit = (id: number, nextLabel: string, nextPrice: string) => {
+    const label = nextLabel.trim();
+    const cents = Math.round(parseFloat(nextPrice.replace(',', '.')) * 100);
+    if (!label || !Number.isFinite(cents) || cents <= 0) return;
+    updateItem(id, label, cents);
+    reload();
+  };
+
+  /** Split a multi-unit line ("2X Caesar $24") into `qty` separate items
+   *  ($12 each) so each unit can go to a different person. The original row
+   *  becomes unit 1 (keeping its place); the rest are appended. */
+  const splitItem = (item: Item, qty: number, base: string) => {
+    const parts = allocateProRata(item.priceCents, Array(qty).fill(1));
+    updateItem(item.id!, base, parts[0]);
+    for (let k = 1; k < qty; k++) addItem(billId, base, parts[k]);
+    reload();
+    openItem(item.id!, base, parts[0]);
   };
 
   /** Toggle one person on/off the focused item. */
@@ -120,33 +178,13 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
     reload();
   };
 
-  const itemMenu = (item: Item) => {
-    Alert.alert(item.label, formatCents(item.priceCents), [
+  const deleteFocusedItem = (item: Item) => {
+    Alert.alert(`Delete ${item.label}?`, undefined, [
       {
-        text: 'Edit price',
-        onPress: () => {
-          if (Platform.OS === 'ios') {
-            Alert.prompt(
-              'Edit price',
-              item.label,
-              (v) => {
-                const cents = Math.round(parseFloat(v.replace(',', '.')) * 100);
-                if (Number.isFinite(cents) && cents > 0) {
-                  updateItem(item.id!, item.label, cents);
-                  reload();
-                }
-              },
-              'plain-text',
-              (item.priceCents / 100).toFixed(2),
-              'decimal-pad',
-            );
-          }
-        },
-      },
-      {
-        text: 'Delete item',
+        text: 'Delete',
         style: 'destructive',
         onPress: () => {
+          setFocusedItemId(null);
           deleteItem(item.id!);
           reload();
         },
@@ -155,12 +193,30 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
     ]);
   };
 
-  const personMenu = (p: Person) => {
-    Alert.alert(p.name, undefined, [
+  /** Tap a person chip to open the rename/remove editor; tap again to close. */
+  const editPerson = (p: Person) => {
+    if (editingPersonId === p.id) {
+      setEditingPersonId(null);
+    } else {
+      setEditingPersonId(p.id!);
+      setPersonNameText(p.name);
+    }
+  };
+
+  const commitPersonName = (id: number, text: string) => {
+    const name = text.trim();
+    if (!name) return; // keep the old name until a non-empty one is typed
+    renamePerson(id, name);
+    reload();
+  };
+
+  const removePerson = (p: Person) => {
+    Alert.alert(`Remove ${p.name}?`, 'Their assignments will be cleared.', [
       {
-        text: 'Remove from bill',
+        text: 'Remove',
         style: 'destructive',
         onPress: () => {
+          setEditingPersonId(null);
           deletePerson(p.id!);
           reload();
         },
@@ -228,6 +284,21 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
     Share.share({ message: buildShareText(bill.name, people, totals) }).catch(() => {});
   };
 
+  const finishBill = () => {
+    if (items.length === 0) {
+      onNewBill(); // empty bill — nothing to keep, just start fresh
+      return;
+    }
+    Alert.alert(
+      'Done with this bill?',
+      "It's saved in History. Starting a fresh bill.",
+      [
+        { text: 'Done', onPress: onNewBill },
+        { text: 'Keep editing', style: 'cancel' },
+      ],
+    );
+  };
+
   const personById = new Map(people.map((p) => [p.id!, p]));
 
   return (
@@ -237,30 +308,55 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
     >
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <View style={styles.topBar}>
+        <View style={styles.header}>
+          <View style={styles.brand}>
+            <Image
+              source={require('../../assets/icon.png')}
+              style={styles.brandMark}
+            />
+            <Text style={styles.brandName}>Tally</Text>
+          </View>
+          <View style={styles.headerLinks}>
+            <Pressable onPress={onHistory} hitSlop={8}>
+              <Text style={styles.topLink}>History</Text>
+            </Pressable>
+            <Pressable onPress={onSettings} hitSlop={8}>
+              <Text style={styles.topLink}>Settings</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.accentBar}>
+          {brandStripe.map((c) => (
+            <View key={c} style={[styles.accentSeg, { backgroundColor: c }]} />
+          ))}
+        </View>
+
+        <Pressable style={styles.nameField} onPress={() => nameRef.current?.focus()}>
           <TextInput
+            ref={nameRef}
             style={styles.billName}
             value={bill.name}
-            placeholder="Restaurant"
+            placeholder="Name this bill"
             placeholderTextColor={colors.textMuted}
             onChangeText={(name) => saveBill({ name })}
           />
-          <Pressable onPress={onHistory} hitSlop={8}>
-            <Text style={styles.topLink}>History</Text>
-          </Pressable>
-          <Pressable onPress={onSettings} hitSlop={8}>
-            <Text style={styles.topLink}>Settings</Text>
-          </Pressable>
-        </View>
+          <Text style={styles.pencil}>✎</Text>
+        </Pressable>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
           {people.map((p) => {
             const c = personColor(p.colorIdx);
+            const editing = p.id === editingPersonId;
             return (
               <Pressable
                 key={p.id}
-                onLongPress={() => personMenu(p)}
-                style={[styles.chip, { backgroundColor: c.bg }]}
+                onPress={() => editPerson(p)}
+                style={[
+                  styles.chip,
+                  { backgroundColor: c.bg },
+                  editing && { borderColor: c.main, borderWidth: 2 },
+                ]}
               >
                 <View style={[styles.avatar, { backgroundColor: c.main }]}>
                   <Text style={styles.avatarText}>{p.name[0]?.toUpperCase() ?? '?'}</Text>
@@ -286,9 +382,40 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
             </Pressable>
           )}
         </ScrollView>
+
+        {editingPersonId != null &&
+          (() => {
+            const p = people.find((x) => x.id === editingPersonId);
+            if (!p) return null;
+            const c = personColor(p.colorIdx);
+            return (
+              <View style={styles.personEditor}>
+                <TextInput
+                  style={styles.personNameInput}
+                  value={personNameText}
+                  placeholder="Name"
+                  placeholderTextColor={colors.textMuted}
+                  autoFocus
+                  onChangeText={(v) => {
+                    setPersonNameText(v);
+                    commitPersonName(p.id!, v);
+                  }}
+                  onSubmitEditing={() => setEditingPersonId(null)}
+                />
+                <Pressable
+                  style={[styles.personRemoveBtn, { borderColor: c.main }]}
+                  onPress={() => removePerson(p)}
+                  hitSlop={6}
+                >
+                  <Text style={styles.personRemoveText}>Remove</Text>
+                </Pressable>
+              </View>
+            );
+          })()}
+
         {people.length > 0 && (
           <Text style={styles.hint}>
-            Tap an item, then tap everyone who shared it. Long-press a name to remove.
+            Tap an item, then tap everyone who shared it. Tap a name to rename or remove.
           </Text>
         )}
 
@@ -303,7 +430,6 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
               <View key={item.id}>
                 <Pressable
                   onPress={() => focusItem(item)}
-                  onLongPress={() => itemMenu(item)}
                   style={[styles.itemRow, focused && styles.itemRowFocused]}
                 >
                   <View style={styles.itemLeft}>
@@ -329,6 +455,42 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
 
                 {focused && (
                   <View style={styles.assignTray}>
+                    <View style={styles.editRow}>
+                      <TextInput
+                        style={styles.editLabelInput}
+                        value={editLabel}
+                        placeholder="Item name"
+                        placeholderTextColor={colors.textMuted}
+                        onChangeText={(v) => {
+                          setEditLabel(v);
+                          commitItemEdit(item.id!, v, editPrice);
+                        }}
+                      />
+                      <TextInput
+                        style={styles.editPriceInput}
+                        value={editPrice}
+                        placeholder="0.00"
+                        placeholderTextColor={colors.textMuted}
+                        keyboardType="decimal-pad"
+                        onChangeText={(v) => {
+                          setEditPrice(v);
+                          commitItemEdit(item.id!, editLabel, v);
+                        }}
+                      />
+                    </View>
+                    {(() => {
+                      const q = parseQuantity(editLabel);
+                      return q ? (
+                        <Pressable
+                          style={styles.splitBtn}
+                          onPress={() => splitItem(item, q.qty, q.base)}
+                        >
+                          <Text style={styles.splitBtnText}>
+                            Split into {q.qty} separate items · {formatCents(Math.round(item.priceCents / q.qty))} each
+                          </Text>
+                        </Pressable>
+                      ) : null;
+                    })()}
                     {people.length === 0 ? (
                       <Text style={styles.assignEmpty}>Add a person above to assign this.</Text>
                     ) : (
@@ -384,6 +546,13 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
                         )}
                       </>
                     )}
+                    <Pressable
+                      style={styles.deleteItemBtn}
+                      onPress={() => deleteFocusedItem(item)}
+                      hitSlop={6}
+                    >
+                      <Text style={styles.deleteItemText}>Delete item</Text>
+                    </Pressable>
                   </View>
                 )}
               </View>
@@ -457,11 +626,12 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
             <Text style={styles.taxLabel}>Tax</Text>
             <TextInput
               style={styles.taxInput}
-              value={bill.taxCents === 0 ? '' : (bill.taxCents / 100).toFixed(2)}
+              value={taxText}
               placeholder="0.00"
               placeholderTextColor={colors.textMuted}
               keyboardType="decimal-pad"
               onChangeText={(v) => {
+                setTaxText(v);
                 const cents = Math.round(parseFloat(v.replace(',', '.') || '0') * 100);
                 saveBill({ taxCents: Number.isFinite(cents) && cents > 0 ? cents : 0 });
               }}
@@ -484,12 +654,10 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
             if (!p) return null;
             const c = personColor(p.colorIdx);
             return (
-              <View key={t.personId} style={[styles.totalCard, { backgroundColor: c.bg }]}>
-                <Text style={[styles.totalName, { color: c.text }]}>{p.name}</Text>
-                <Text style={[styles.totalAmount, { color: c.text }]}>
-                  {formatCents(t.totalCents)}
-                </Text>
-                <Text style={[styles.totalBreakdown, { color: c.main }]}>
+              <View key={t.personId} style={[styles.totalCard, { backgroundColor: c.main }]}>
+                <Text style={[styles.totalName, { color: colors.onSolid }]}>{p.name}</Text>
+                <Text style={styles.totalAmount}>{formatCents(t.totalCents)}</Text>
+                <Text style={[styles.totalBreakdown, { color: colors.onSolidFaint }]}>
                   {formatCents(t.subtotalCents)} + tip {formatCents(t.tipCents)}
                 </Text>
               </View>
@@ -506,6 +674,9 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
 
         <Pressable style={styles.shareBtn} onPress={share}>
           <Text style={styles.shareBtnText}>Share totals</Text>
+        </Pressable>
+        <Pressable style={styles.doneBtn} onPress={finishBill}>
+          <Text style={styles.doneBtnText}>Done — start a new bill</Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -528,15 +699,41 @@ function SummaryRow(props: { label: string; value: string; bold?: boolean }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { padding: 16, paddingTop: 64, paddingBottom: 48 },
-  topBar: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  brandMark: { width: 28, height: 28, borderRadius: 7 },
+  brandName: {
+    fontSize: 20,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+    color: colors.textPrimary,
+  },
+  headerLinks: { flexDirection: 'row', gap: 16 },
+  accentBar: { flexDirection: 'row', gap: 3, marginBottom: 16 },
+  accentSeg: { flex: 1, height: 3, borderRadius: 2 },
+  nameField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#dcd6ca',
+    paddingBottom: 6,
+    marginBottom: 16,
+  },
   billName: {
     flex: 1,
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: '600',
     color: colors.textPrimary,
     padding: 0,
   },
-  topLink: { color: colors.textMuted, fontSize: 14, marginLeft: 16 },
+  pencil: { fontSize: 15, color: '#a8a29a' },
+  topLink: { color: colors.textMuted, fontSize: 14 },
   chipRow: { flexGrow: 0, marginBottom: 6 },
   chip: {
     flexDirection: 'row',
@@ -578,6 +775,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textPrimary,
   },
+  personEditor: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  personNameInput: {
+    flex: 1,
+    fontSize: 15,
+    color: colors.textPrimary,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  personRemoveBtn: {
+    borderRadius: 10,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  personRemoveText: { color: colors.danger, fontSize: 14, fontWeight: '500' },
   hint: { color: colors.textMuted, fontSize: 12, marginBottom: 10 },
   card: {
     backgroundColor: colors.card,
@@ -609,6 +831,49 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 4,
   },
+  editRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.hairline,
+  },
+  editLabelInput: {
+    flex: 1,
+    fontSize: 15,
+    color: colors.textPrimary,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  editPriceInput: {
+    width: 84,
+    fontSize: 15,
+    color: colors.textPrimary,
+    textAlign: 'right',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  splitBtn: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.brand,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  splitBtnText: { color: colors.brand, fontSize: 13, fontWeight: '500' },
+  deleteItemBtn: { marginTop: 12, alignSelf: 'flex-start' },
+  deleteItemText: { color: colors.danger, fontSize: 13, fontWeight: '500' },
   assignEmpty: { fontSize: 13, color: colors.textMuted },
   assignLabel: { fontSize: 12, color: colors.textMuted, marginBottom: 8 },
   assignChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -681,13 +946,20 @@ const styles = StyleSheet.create({
   totalCard: {
     flexGrow: 1,
     flexBasis: '30%',
-    borderRadius: 12,
-    padding: 10,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
     alignItems: 'center',
   },
   totalName: { fontSize: 12, fontWeight: '500' },
-  totalAmount: { fontSize: 18, fontWeight: '600', marginTop: 2, fontVariant: ['tabular-nums'] },
-  totalBreakdown: { fontSize: 10, marginTop: 2 },
+  totalAmount: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
+  },
+  totalBreakdown: { fontSize: 10, marginTop: 3 },
   summary: { paddingHorizontal: 6, marginBottom: 16 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   summaryLabel: { color: colors.textBody, fontSize: 14 },
@@ -700,4 +972,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   shareBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  doneBtn: { paddingVertical: 14, alignItems: 'center', marginTop: 4 },
+  doneBtnText: { color: colors.brand, fontSize: 15, fontWeight: '500' },
 });

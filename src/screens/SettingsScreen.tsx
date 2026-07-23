@@ -1,7 +1,7 @@
 // src/screens/SettingsScreen.tsx
 // Default tip, backup export/import (never gated), and the Pro section.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -14,7 +14,13 @@ import { StatusBar } from 'expo-status-bar';
 import { exportBackup, pickBackup } from '../backup';
 import { replaceAll } from '../db';
 import { useSettings } from '../SettingsContext';
-import { useProAccess, isFailOpen, purchasePro, restorePurchases } from '../proAccess';
+import {
+  useProAccess,
+  isFailOpen,
+  getProPriceString,
+  purchasePro,
+  restorePurchases,
+} from '../proAccess';
 import { FREE_SCANS } from '../revenuecat';
 import { colors } from '../theme';
 
@@ -26,6 +32,11 @@ export default function SettingsScreen({ onBack }: Props) {
   const { settings, update } = useSettings();
   const pro = useProAccess();
   const [busy, setBusy] = useState(false);
+  const [priceString, setPriceString] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pro) getProPriceString().then(setPriceString);
+  }, [pro]);
 
   const doExport = async () => {
     setBusy(true);
@@ -137,8 +148,12 @@ export default function SettingsScreen({ onBack }: Props) {
               One-time purchase for unlimited receipt scans. Manual entry, splitting, and
               export are free forever. Scans used: {settings.scansUsed}/{FREE_SCANS} free.
             </Text>
-            <Pressable style={styles.btn} onPress={buyPro}>
-              <Text style={styles.btnText}>Unlock unlimited scans</Text>
+            <Pressable style={styles.buyBtn} onPress={buyPro}>
+              <Text style={styles.buyBtnText}>
+                {priceString
+                  ? `Unlock unlimited scans — ${priceString}`
+                  : 'Unlock unlimited scans'}
+              </Text>
             </Pressable>
           </>
         )}
@@ -186,4 +201,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   btnText: { color: colors.textBody, fontSize: 15, fontWeight: '500' },
+  buyBtn: {
+    borderRadius: 10,
+    backgroundColor: colors.brand,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  buyBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 });

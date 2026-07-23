@@ -9,6 +9,10 @@
 // Manual entry, splitting, and share/export are free forever — core record-keeping
 // is never gated (house rule).
 //
+// PRICE: $4.99 one-time (decided 2026-07). The App Store product is the source of
+// truth for the actual charged price and its localization — the app shows the
+// store's priceString, never a hardcoded number. Set $4.99 on the ASC product.
+//
 // SETUP (Simon): after creating the RevenueCat "Tally" project, paste the PUBLIC
 // SDK keys below. Then open the RC Entitlements page and confirm ENTITLEMENT_ID matches
 // EXACTLY what the wizard created — identifiers are IMMUTABLE (the Billowe capital-`P`

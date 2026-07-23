@@ -1,17 +1,23 @@
 // src/theme.ts — Tally palette, per approved design: clean minimal light UI,
 // person accent colors do the visual heavy lifting (chip -> line item -> total).
 export const colors = {
-  bg: '#f7f7f5',
+  bg: '#f7f5f0', // warm paper, matches the app icon
   card: '#ffffff',
-  cardBorder: '#e6e6e2',
-  hairline: '#ededea',
+  cardBorder: '#e9e5db',
+  hairline: '#f1eee7',
   textPrimary: '#1a1a18',
   textBody: '#44443f',
   textMuted: '#8a8a84',
-  accent: '#1a1a18', // buttons stay ink-neutral; color belongs to people
+  accent: '#1a1a18', // primary buttons stay ink-neutral
+  brand: '#534ab7', // accent for secondary/brand touches (from the icon)
   danger: '#c93b3b',
   success: '#1d9e75',
+  onSolid: 'rgba(255,255,255,0.82)', // label text on a solid person-color card
+  onSolidFaint: 'rgba(255,255,255,0.72)',
 } as const;
+
+/** The four icon strokes, in order — used for the header accent rule. */
+export const brandStripe = ['#534ab7', '#1d9e75', '#d85a30', '#d4537e'];
 
 export interface PersonColor {
   main: string; // avatar fill, dots

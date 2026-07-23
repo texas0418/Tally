@@ -89,22 +89,45 @@ export async function initPurchases(): Promise<void> {
   }
 }
 
-/** Attempt the one-time purchase. Resolves true if Pro is unlocked afterwards.
- *  Throws on real errors; a user cancel surfaces as an error with `userCancelled`. */
+/** The RevenueCat package that grants Pro, or null when RC can't gate. */
+async function getProPackage(): Promise<any | null> {
+  const Purchases = getPurchases();
+  if (!Purchases || failOpen) return null;
+  const offerings = await Purchases.getOfferings();
+  const pkgs = offerings?.current?.availablePackages ?? [];
+  return pkgs.find((p: any) => p?.product?.identifier === PRODUCT_ID) ?? pkgs[0] ?? null;
+}
+
+/** Localized store price string (e.g. "$4.99"), or null if unavailable
+ *  (placeholder keys, no offering, or offline). Never hardcode the price —
+ *  the App Store product is the source of truth. */
+export async function getProPriceString(): Promise<string | null> {
+  try {
+    const pkg = await getProPackage();
+    return pkg?.product?.priceString ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Attempt the one-time purchase. Resolves true if Pro is unlocked afterwards,
+ *  false if the user cancelled. Throws only on real errors (network, config). */
 export async function purchasePro(): Promise<boolean> {
   const Purchases = getPurchases();
   if (!Purchases || failOpen) return true; // nothing to buy — already unlocked
 
-  const offerings = await Purchases.getOfferings();
-  const pkgs = offerings?.current?.availablePackages ?? [];
-  const pkg =
-    pkgs.find((p: any) => p?.product?.identifier === PRODUCT_ID) ?? pkgs[0];
+  const pkg = await getProPackage();
   if (!pkg) throw new Error('No products available right now. Please try again later.');
 
-  const { customerInfo } = await Purchases.purchasePackage(pkg);
-  const ok = hasEntitlement(customerInfo);
-  setPro(ok);
-  return ok;
+  try {
+    const { customerInfo } = await Purchases.purchasePackage(pkg);
+    const ok = hasEntitlement(customerInfo);
+    setPro(ok);
+    return ok;
+  } catch (e: any) {
+    if (e?.userCancelled) return false; // not an error — user backed out
+    throw e;
+  }
 }
 
 /** Restore prior purchases (required for App Review). Resolves true if Pro is active. */
