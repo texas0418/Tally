@@ -34,8 +34,23 @@ export default function SettingsScreen({ onBack }: Props) {
   const [busy, setBusy] = useState(false);
   const [priceString, setPriceString] = useState<string | null>(null);
 
+  // Offerings load async on cold start, so the first price fetch can come back
+  // empty. Retry a few times until RevenueCat has the package.
   useEffect(() => {
-    if (!pro) getProPriceString().then(setPriceString);
+    if (pro) return;
+    let cancelled = false;
+    let tries = 0;
+    const load = () => {
+      getProPriceString().then((p) => {
+        if (cancelled) return;
+        if (p) setPriceString(p);
+        else if (tries++ < 6) setTimeout(load, 1500);
+      });
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [pro]);
 
   const doExport = async () => {

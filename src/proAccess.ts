@@ -76,6 +76,9 @@ export async function initPurchases(): Promise<void> {
 
   try {
     Purchases.configure({ apiKey });
+    // Warm the offerings cache so the paywall price is ready by the time
+    // Settings mounts (offerings load async after configure).
+    Purchases.getOfferings().catch(() => {});
     Purchases.addCustomerInfoUpdateListener((info: any) => {
       setPro(hasEntitlement(info));
     });
