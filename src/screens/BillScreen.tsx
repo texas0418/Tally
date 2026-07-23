@@ -53,7 +53,9 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
   const [people, setPeople] = useState<Person[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [assignments, setAssignments] = useState<Assignments>(new Map());
-  const [selectedPerson, setSelectedPerson] = useState<number | null>(null);
+  // Item-first assignment: tap an item to focus it, then tap people to toggle
+  // who shared it. null = nothing focused.
+  const [focusedItemId, setFocusedItemId] = useState<number | null>(null);
   const [newPersonName, setNewPersonName] = useState('');
   const [addingPerson, setAddingPerson] = useState(false);
   const [newLabel, setNewLabel] = useState('');
@@ -64,11 +66,10 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
     setBill(getBill(billId));
     const ppl = listPeople(billId);
     setPeople(ppl);
-    setItems(listItems(billId));
+    const its = listItems(billId);
+    setItems(its);
     setAssignments(listAssignments(billId));
-    setSelectedPerson((cur) =>
-      cur != null && ppl.some((p) => p.id === cur) ? cur : (ppl[0]?.id ?? null),
-    );
+    setFocusedItemId((cur) => (its.some((i) => i.id === cur) ? cur : null));
   }, [billId]);
 
   useEffect(reload, [reload]);
@@ -91,9 +92,8 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
     setNewPersonName('');
     setAddingPerson(false);
     if (!name) return;
-    const id = addPerson({ billId, name, colorIdx: people.length });
+    addPerson({ billId, name, colorIdx: people.length });
     reload();
-    setSelectedPerson(id);
   };
 
   const commitItem = () => {
@@ -101,19 +101,22 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
     const cents = Math.round(parseFloat(newPrice.replace(',', '.')) * 100);
     if (!label || !Number.isFinite(cents) || cents <= 0) return;
     const id = addItem(billId, label, cents);
-    if (selectedPerson != null) setAssigned(id, selectedPerson, true);
     setNewLabel('');
     setNewPrice('');
     reload();
+    setFocusedItemId(id); // open the new item so you can assign it right away
   };
 
-  const toggleItem = (item: Item) => {
-    if (selectedPerson == null) {
-      Alert.alert('Add a person first', 'Tap + to add who was at the table.');
-      return;
-    }
-    const on = assignments.get(item.id!)?.has(selectedPerson) ?? false;
-    setAssigned(item.id!, selectedPerson, !on);
+  /** Tapping an item focuses it (reveals the people toggles); tapping the
+   *  already-focused item collapses it. */
+  const focusItem = (item: Item) => {
+    setFocusedItemId((cur) => (cur === item.id ? null : item.id!));
+  };
+
+  /** Toggle one person on/off the focused item. */
+  const togglePersonOnItem = (itemId: number, personId: number) => {
+    const on = assignments.get(itemId)?.has(personId) ?? false;
+    setAssigned(itemId, personId, !on);
     reload();
   };
 
@@ -253,17 +256,11 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
           {people.map((p) => {
             const c = personColor(p.colorIdx);
-            const sel = p.id === selectedPerson;
             return (
               <Pressable
                 key={p.id}
-                onPress={() => setSelectedPerson(p.id!)}
                 onLongPress={() => personMenu(p)}
-                style={[
-                  styles.chip,
-                  { backgroundColor: c.bg },
-                  sel && { borderColor: c.main, borderWidth: 2 },
-                ]}
+                style={[styles.chip, { backgroundColor: c.bg }]}
               >
                 <View style={[styles.avatar, { backgroundColor: c.main }]}>
                   <Text style={styles.avatarText}>{p.name[0]?.toUpperCase() ?? '?'}</Text>
@@ -291,45 +288,105 @@ export default function BillScreen({ billId, onHistory, onSettings }: Props) {
         </ScrollView>
         {people.length > 0 && (
           <Text style={styles.hint}>
-            Tap a person, then tap their items. Long-press to remove.
+            Tap an item, then tap everyone who shared it. Long-press a name to remove.
           </Text>
         )}
 
         <View style={styles.card}>
           {items.map((item) => {
-            const assigned = [...(assignments.get(item.id!) ?? [])]
+            const assignedIds = assignments.get(item.id!) ?? new Set<number>();
+            const assigned = [...assignedIds]
               .map((id) => personById.get(id))
               .filter(Boolean) as Person[];
-            const mine =
-              selectedPerson != null &&
-              (assignments.get(item.id!)?.has(selectedPerson) ?? false);
+            const focused = item.id === focusedItemId;
             return (
-              <Pressable
-                key={item.id}
-                onPress={() => toggleItem(item)}
-                onLongPress={() => itemMenu(item)}
-                style={[styles.itemRow, mine && styles.itemRowMine]}
-              >
-                <View style={styles.itemLeft}>
-                  <Text style={styles.itemLabel}>{item.label}</Text>
-                  {assigned.length > 0 ? (
-                    <Text style={styles.itemAssignees}>
-                      {assigned.map((p, i) => (
-                        <Text key={p.id} style={{ color: personColor(p.colorIdx).main }}>
-                          {i > 0 ? ' ' : ''}●{' '}
-                          <Text style={styles.assigneeName}>{p.name}</Text>
-                        </Text>
-                      ))}
-                      {assigned.length > 1 && (
-                        <Text style={styles.assigneeName}>  ÷{assigned.length}</Text>
-                      )}
-                    </Text>
-                  ) : (
-                    <Text style={styles.itemUnassigned}>unassigned</Text>
-                  )}
-                </View>
-                <Text style={styles.itemPrice}>{formatCents(item.priceCents)}</Text>
-              </Pressable>
+              <View key={item.id}>
+                <Pressable
+                  onPress={() => focusItem(item)}
+                  onLongPress={() => itemMenu(item)}
+                  style={[styles.itemRow, focused && styles.itemRowFocused]}
+                >
+                  <View style={styles.itemLeft}>
+                    <Text style={styles.itemLabel}>{item.label}</Text>
+                    {assigned.length > 0 ? (
+                      <Text style={styles.itemAssignees}>
+                        {assigned.map((p, i) => (
+                          <Text key={p.id} style={{ color: personColor(p.colorIdx).main }}>
+                            {i > 0 ? ' ' : ''}●{' '}
+                            <Text style={styles.assigneeName}>{p.name}</Text>
+                          </Text>
+                        ))}
+                        {assigned.length > 1 && (
+                          <Text style={styles.assigneeName}>  ÷{assigned.length}</Text>
+                        )}
+                      </Text>
+                    ) : (
+                      <Text style={styles.itemUnassigned}>tap to assign</Text>
+                    )}
+                  </View>
+                  <Text style={styles.itemPrice}>{formatCents(item.priceCents)}</Text>
+                </Pressable>
+
+                {focused && (
+                  <View style={styles.assignTray}>
+                    {people.length === 0 ? (
+                      <Text style={styles.assignEmpty}>Add a person above to assign this.</Text>
+                    ) : (
+                      <>
+                        <Text style={styles.assignLabel}>Who shared this?</Text>
+                        <View style={styles.assignChips}>
+                          {people.map((p) => {
+                            const c = personColor(p.colorIdx);
+                            const on = assignedIds.has(p.id!);
+                            return (
+                              <Pressable
+                                key={p.id}
+                                onPress={() => togglePersonOnItem(item.id!, p.id!)}
+                                style={[
+                                  styles.toggleChip,
+                                  on
+                                    ? { backgroundColor: c.bg, borderColor: c.main }
+                                    : { borderColor: colors.cardBorder },
+                                ]}
+                              >
+                                <View
+                                  style={[
+                                    styles.avatar,
+                                    { backgroundColor: on ? c.main : colors.hairline },
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.avatarText,
+                                      { color: on ? '#fff' : colors.textMuted },
+                                    ]}
+                                  >
+                                    {on ? '✓' : p.name[0]?.toUpperCase() ?? '?'}
+                                  </Text>
+                                </View>
+                                <Text
+                                  style={[
+                                    styles.toggleChipText,
+                                    { color: on ? c.text : colors.textBody },
+                                  ]}
+                                >
+                                  {p.name}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                        {assigned.length > 1 && (
+                          <Text style={styles.assignSplit}>
+                            Split {assigned.length} ways ·{' '}
+                            {formatCents(Math.round(item.priceCents / assigned.length))} each
+                          </Text>
+                        )}
+                      </>
+                    )}
+                  </View>
+                )}
+              </View>
             );
           })}
 
@@ -539,12 +596,33 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.hairline,
     borderRadius: 8,
   },
-  itemRowMine: { backgroundColor: colors.bg },
+  itemRowFocused: { backgroundColor: colors.bg },
   itemLeft: { flex: 1, marginRight: 8 },
   itemLabel: { fontSize: 15, color: colors.textPrimary },
   itemAssignees: { fontSize: 12, marginTop: 2 },
   assigneeName: { color: colors.textMuted },
   itemUnassigned: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontStyle: 'italic' },
+  assignTray: {
+    backgroundColor: colors.bg,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    marginBottom: 4,
+  },
+  assignEmpty: { fontSize: 13, color: colors.textMuted },
+  assignLabel: { fontSize: 12, color: colors.textMuted, marginBottom: 8 },
+  assignChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  toggleChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderWidth: 1.5,
+    backgroundColor: colors.card,
+  },
+  toggleChipText: { fontSize: 14, fontWeight: '500' },
+  assignSplit: { fontSize: 12, color: colors.textBody, marginTop: 10 },
   itemPrice: { fontSize: 15, color: colors.textPrimary, fontVariant: ['tabular-nums'] },
   addRow: { flexDirection: 'row', alignItems: 'center', paddingTop: 10 },
   addLabel: {
