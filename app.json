@@ -9,7 +9,8 @@
     "owner": "boyscout1970",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
+      "buildNumber": "3",
       "appleTeamId": "75ULC33H2C",
       "bundleIdentifier": "com.tallysplit.app",
       "infoPlist": {
