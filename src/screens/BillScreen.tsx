@@ -41,6 +41,7 @@ import {
   updateItem,
 } from '../db';
 import { scanReceipt } from '../scanReceipt';
+import { recordSplitCompleted } from '../review';
 import { useSettings } from '../SettingsContext';
 import { useProAccess, purchasePro } from '../proAccess';
 import { FREE_SCANS } from '../revenuecat';
@@ -293,7 +294,15 @@ export default function BillScreen({ billId, onHistory, onSettings, onNewBill }:
       'Done with this bill?',
       "It's saved in History. Starting a fresh bill.",
       [
-        { text: 'Done', onPress: onNewBill },
+        {
+          text: 'Done',
+          onPress: () => {
+            // The split is complete: totals were on screen and the user
+            // confirmed. This is the review-ask moment (2nd+ split, once ever).
+            recordSplitCompleted();
+            onNewBill();
+          },
+        },
         { text: 'Keep editing', style: 'cancel' },
       ],
     );
