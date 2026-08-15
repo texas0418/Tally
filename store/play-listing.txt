@@ -1,0 +1,64 @@
+TALLY — GOOGLE PLAY STORE LISTING (draft 2026-08-14)
+=====================================================
+
+APP NAME (30 chars max)
+Tally: Bill Splitter & Tip
+
+SHORT DESCRIPTION (80 chars max)
+Scan the receipt, assign each dish, and split the bill fairly to the cent.
+
+FULL DESCRIPTION (4000 chars max)
+-----------------------------------------------------
+Split the restaurant bill by what each person actually ordered — not a lazy even split.
+
+Tally scans the receipt with your camera, reads the line items right on your phone, and lets you assign each dish to a person with a tap. Tax and tip divide proportionally, so the friend who ordered the steak and two cocktails pays their share — and the friend who had a side salad pays theirs. Fair to the cent.
+
+HOW IT WORKS
+1. Scan the receipt (or add items by hand)
+2. Tap to assign each item to a person — shared plates split evenly among whoever shared
+3. Set the tip, see everyone's total, done before the check hits the table
+
+WHY TALLY
+• Receipt scanning happens entirely on your device — the photo never leaves your phone
+• Tax and tip split proportionally by what each person ordered
+• Shared appetizers? Assign one item to several people and it divides evenly
+• Works offline — basements, patios, airplanes, no signal needed
+• No account, no sign-up, no ads
+• Clean, fast, and built for the moment the check arrives
+
+PRIVATE BY DESIGN
+Tally keeps everything on your phone. No cloud, no tracking, no selling your data. The receipt photo is processed on-device and isn't uploaded anywhere.
+
+Perfect for dinners with friends, group trips, work lunches, birthday dinners, and anyone tired of "let's just split it evenly" when they ordered water and an appetizer.
+
+Download Tally and make the end of dinner the easiest part.
+-----------------------------------------------------
+
+CATEGORY: Finance (matches iOS) — alternative: Food & Drink
+TAGS/KEYWORDS CONTEXT: bill splitter, split the bill, tip calculator, receipt scanner, dining, group dinner
+
+CONTACT DETAILS
+Email: (use the support email already on docs/support.html / ASC)
+Website: https://simonbuilds.app/tally/
+Privacy policy URL (REQUIRED): https://texas0418.github.io/Tally/privacy.html  (verified live 2026-08-14; capital T matters)
+
+GRAPHIC ASSETS NEEDED
+- App icon 512x512 PNG (32-bit, <1MB) — export from assets/icon.png
+- Feature graphic 1024x500 PNG/JPEG (REQUIRED) — to be designed (paper-and-ink light palette, wordmark + tagline)
+- Phone screenshots: DONE 2026-08-14 — three 1080x2160 (2:1) shots in store/screenshots-android/ (01-the-bill, 02-who-shared, 03-fair-totals), captured from the real release APK on the Pixel 6 emulator with staged bill "Dinner at Marlows". OPTIONAL LATER: a 4th "scan receipt in progress" shot needs a real receipt + camera (do on the physical Moto when it arrives).
+
+DATA SAFETY FORM (prep — verify against RevenueCat docs at submission)
+- Collects: Purchase history (via Google Play Billing / RevenueCat) — collected, not shared, not optional, for app functionality
+- App interaction/diagnostics: none unless RevenueCat SDK defaults say otherwise — check RevenueCat's Play data-safety guide
+- Receipt photos: processed on-device only, never transmitted — NOT collected under Play's definition (no off-device transmission)
+- No account creation; no location; no contacts
+
+CONTENT RATING QUESTIONNAIRE (prep)
+- Category: Utility/productivity. No violence, no user-generated content, no gambling (tip percentages are not gambling), no data-driven ads
+- Expected rating: Everyone
+
+IN-APP PURCHASE
+- Tally Pro (one-time unlock; mirror iOS product) — needs Google Play Billing product created in Play Console + RevenueCat Google project config before the IAP works. Fail-open RevenueCat pattern means the app functions if billing is unreachable.
+
+RELEASE NOTES (first release)
+Tally arrives on Android: scan the receipt, assign each dish, and split the bill fairly to the cent — private and on-device.
