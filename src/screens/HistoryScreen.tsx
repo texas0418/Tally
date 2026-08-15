@@ -52,6 +52,7 @@ export default function HistoryScreen({
     }
     setBills(listBills());
   }, [currentBillId]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- tech-debt #6
   useEffect(reload, [reload]);
 
   const confirmDelete = (bill: Bill) => {

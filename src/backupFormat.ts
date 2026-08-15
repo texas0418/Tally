@@ -48,6 +48,7 @@ const num = (v: unknown, d: number): number => (typeof v === 'number' ? v : d);
 const str = (v: unknown, d: string): string => (typeof v === 'string' ? v : d);
 
 /** Returns a validated backup or throws Error with a human-readable reason. */
+// eslint-disable-next-line complexity -- tech-debt #4
 export function parseBackup(json: string): BackupV1 {
   let raw: unknown;
   try {

@@ -28,6 +28,7 @@ function Root() {
     if (!loaded || billId != null) return;
     // Open the most recent bill; a brand-new install starts one.
     const bills = listBills();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- tech-debt #6
     setBillId(bills[0]?.id ?? null);
     if (bills.length === 0) startNewBill();
   }, [loaded, billId]);
@@ -38,6 +39,7 @@ function Root() {
     if (!loaded || billId == null || screen !== 'bill') return;
     if (getBill(billId) == null) {
       const bills = listBills();
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- tech-debt #6
       if (bills.length > 0) setBillId(bills[0].id!);
       else startNewBill();
     }
