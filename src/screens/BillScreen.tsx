@@ -56,6 +56,7 @@ interface Props {
   onNewBill: () => void;
 }
 
+// eslint-disable-next-line max-lines-per-function -- tech-debt #5
 export default function BillScreen({ billId, onHistory, onSettings, onNewBill }: Props) {
   const { settings, update } = useSettings();
   const pro = useProAccess();
@@ -98,6 +99,7 @@ export default function BillScreen({ billId, onHistory, onSettings, onNewBill }:
     setFocusedItemId((cur) => (its.some((i) => i.id === cur) ? cur : null));
   }, [billId]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- tech-debt #6
   useEffect(reload, [reload]);
 
   const totals = useMemo(
@@ -647,7 +649,7 @@ export default function BillScreen({ billId, onHistory, onSettings, onNewBill }:
             />
           </View>
           <Text style={styles.hintInCard}>
-            Tip and tax split by each person's share, not evenly.
+            Tip and tax split by each person&apos;s share, not evenly.
           </Text>
         </View>
 

@@ -91,6 +91,7 @@ function cleanLabel(raw: string): string {
     .trim();
 }
 
+// eslint-disable-next-line complexity -- tech-debt #4
 export function parseReceipt(lines: OcrLine[]): ParsedReceipt {
   const rows = linesToRows(lines);
   const items: ParsedItem[] = [];
