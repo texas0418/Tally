@@ -31,7 +31,9 @@
       ],
       "expo-asset",
       "expo-font",
-      "./plugins/withReleaseSigning.js"
+      "./plugins/withReleaseSigning.js",
+      "expo-sharing",
+      "expo-sqlite"
     ]
   }
 }
