@@ -39,6 +39,7 @@ async function pickImage(source: 'camera' | 'library'): Promise<string | null> {
 
 /** Full scan flow. Resolves null if the user cancelled the picker.
  *  Throws with a readable message when scanning can't run. */
+// eslint-disable-next-line complexity -- tech-debt #4
 export async function scanReceipt(
   source: 'camera' | 'library',
 ): Promise<ParsedReceipt | null> {
