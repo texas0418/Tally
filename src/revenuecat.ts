@@ -21,7 +21,7 @@
 
 // Public SDK keys (safe to ship in the app bundle — these are NOT secret).
 export const RC_API_KEY_IOS = 'appl_oNVNGwDoCURZXhnrARzVVXiXDxz'; // public SDK key (safe to ship)
-export const RC_API_KEY_ANDROID = 'REPLACE_WITH_RC_ANDROID_KEY'; // starts with "goog_"
+export const RC_API_KEY_ANDROID = 'goog_oKqlijXcgwFTsorDlfmTPGRuiqZ'; // starts with "goog_"
 
 // The entitlement that grants Pro. CONFIRM on the RC Entitlements page before trusting.
 export const ENTITLEMENT_ID = 'pro';
