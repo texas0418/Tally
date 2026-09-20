@@ -19,7 +19,8 @@
     },
     "android": {
       "package": "com.tallysplit.app",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "versionCode": 2
     },
     "plugins": [
       [
