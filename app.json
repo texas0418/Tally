@@ -20,7 +20,7 @@
     "android": {
       "package": "com.tallysplit.app",
       "predictiveBackGestureEnabled": false,
-      "versionCode": 2
+      "versionCode": 3
     },
     "plugins": [
       [
