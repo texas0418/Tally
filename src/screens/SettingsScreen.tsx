@@ -23,6 +23,7 @@ import {
 } from '../proAccess';
 import { FREE_SCANS } from '../revenuecat';
 import { colors } from '../theme';
+import MoreApps from '../components/MoreApps';
 
 interface Props {
   onBack: () => void;
@@ -176,7 +177,8 @@ export default function SettingsScreen({ onBack }: Props) {
           <Text style={styles.btnText}>Restore purchases</Text>
         </Pressable>
       </View>
-    </ScrollView>
+      <MoreApps />
+      </ScrollView>
   );
 }
 
